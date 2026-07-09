@@ -1,0 +1,98 @@
+# Loop Engineering vs Prompt Engineering — Study Notes
+
+Synthesized from: Loop Engineering (June 7, 2026), Loop Engineering vs Prompt Engineering (MindStudio, June 20, 2026), and Loop Engineering vs. Prompt Engineering: The Next Shift in AI System Design (Rashmi, Medium).
+
+---
+
+## 1. Prompt Engineering — the short version
+
+- The unit of work is **one request → one response**. A human writes the prompt, the model answers, a human reads and judges it.
+- The human *is* the control loop: every retry, every "try again with more context" is a manual decision made outside the model.
+- Core techniques: zero-shot, few-shot examples, chain-of-thought instructions, role prompting, system prompts, and explicit output-format constraints.
+- Assumes a human is present at every iteration — it works because someone is there to catch a bad output and immediately steer the next one.
+- Skill center of gravity: **communication** — phrasing, context selection, examples, constraining the output.
+- Nothing here disappears once you start doing loop engineering — every planning step, tool call, and self-check inside a loop is still, underneath, a prompt. Prompting becomes a component instead of the whole job.
+
+## 2. Loop Engineering — the short version
+
+- The unit of work is a **running system**: observe → plan → execute → evaluate → decide to continue, retry, or stop — repeated without a human at every step.
+- Two industry voices (Peter Steinberger; Boris Cherny, who leads Claude Code at Anthropic) both describe the same shift: instead of prompting the agent directly, you design the loop that prompts it for you.
+- A loop is built from recurring pieces, regardless of which coding-agent product you're in:
+  - **Automations** — scheduled or triggered runs that do discovery/triage on their own (cron jobs, scheduled tasks, `/loop`, `/goal`, hooks, GitHub Actions in Claude Code; the Automations tab and `/goal` in Codex).
+  - **Worktrees** — isolated working copies so parallel agents don't collide on the same files (`git worktree`, built-in per-thread worktrees).
+  - **Skills** — a `SKILL.md`-style folder that encodes project conventions once, so the agent stops re-deriving context from zero every session.
+  - **Plugins / connectors** — MCP-based links into real tools (issue trackers, Slack, staging APIs) so the loop can act, not just describe.
+  - **Sub-agents** — a maker/checker split: one agent proposes, a separate agent (often a different model or a fresh context) verifies, because a model is a poor judge of its own work.
+  - **State / memory** — the piece that ties it together: a markdown file, a Linear board, a repo — something that lives outside the single conversation and survives between runs, since the model itself forgets everything once the session ends.
+- A structured way to describe the same cycle in code: a class-like loop that holds `observe()`, `plan()`, `execute()`, `evaluate()`, and a stopping/`max_iterations` guard — frameworks like LangGraph and CrewAI formalize this as explicit state graphs instead of a hand-rolled loop.
+- Skill center of gravity: **systems design** — architecture, control flow, evaluation criteria, retry/termination logic, memory management.
+- The "no" branch is the structural tell: in prompt engineering it routes back to a person; in loop engineering it routes back into the system. That's what turns a chatbot into an agent.
+
+---
+
+## 2a. What loop engineering still doesn't do for you
+
+Across all three sources, the same caution recurs: a loop is leverage, not a replacement for judgment.
+
+- **Verification is still your responsibility.** An unattended loop is also a loop that can fail unattended. "Done" reported by a loop is a claim, not a proof — a trusted verifier sub-agent is what makes walking away safe, not a guarantee.
+- **Comprehension debt.** The faster a loop ships code you didn't personally write or read, the wider the gap between what exists and what you actually understand about your own system.
+- **Missing termination conditions are the most common design mistake.** Every loop needs a defined success condition, failure condition, and a hard max-iteration/cost cap — otherwise it can burn tokens indefinitely without converging.
+- **The same loop produces different outcomes for different people** — one person uses it to move faster on work they understand deeply; another uses it to avoid understanding the work at all. The tooling can't tell the difference; you have to.
+
+---
+
+## 3. Detailed Comparison
+
+| Dimension | Prompt Engineering | Loop Engineering |
+|---|---|---|
+| **A. What is it** | Crafting a single input to get a better single output from a model. A request/response exchange. | Designing the automated control flow — observe, plan, execute, evaluate, decide — that lets an agent keep working toward a goal across many steps without a human driving each one. |
+| **B. Why use it** | It's how you communicate intent to a model and how you explore what a model can actually do before you automate anything around it. Cheap, fast, no infrastructure. | Needed once volume, multi-step dependencies, or unattended operation make "a human reviews every output" impractical. Turns one-off help into something that runs, checks itself, and scales. |
+| **C. How to use it (tools / techniques)** | Zero-shot / few-shot prompting, chain-of-thought instructions, role prompting, system prompts, output-format constraints. Manual iteration: write → read → rewrite. | Automations & schedulers (cron, `/loop`, `/goal`, hooks, GitHub Actions), worktrees for isolation, `SKILL.md` files for codified project knowledge, MCP plugins/connectors for real-tool access, sub-agents for a maker/checker split, and a persistent state store (markdown file, Linear/issue board, repo) as memory across runs. In code, this is often an explicit loop class with `observe/plan/execute/evaluate` and a max-iteration guard, or a framework like LangGraph/CrewAI. |
+| **D. When to use it** | Single-turn or short-turn products (chatbots, one-off generation); simple tasks solvable in one pass (summarize, classify, translate); low, human-reviewable volume; the exploration phase before you know what "good output" even looks like. | Multi-step, interdependent tasks (research → draft → fact-check → publish); tasks needing an automated quality gate at scale; anything with no human available at each step (3am jobs, event-triggered pipelines, high-volume processing); coordinating multiple agents where someone/something has to route and arbitrate between them. |
+| **Human's role** | Present and active at every iteration — writes, reads, judges, rewrites. | Sets the objective, designs the evaluation criteria, and reviews at checkpoints — not every step. Review bandwidth becomes the real ceiling on how many parallel loops you can run. |
+| **Where planning happens** | In the human's head, turn by turn. | Encoded into the system (or delegated to a planning step the agent runs itself), revised automatically on failure. |
+| **Error recovery** | Human notices the problem and writes a new prompt. | System detects a failed evaluation and replans/retries itself, up to a defined limit. |
+| **Memory model** | Conversation context only — gone once the session ends. | Persistent state outside the conversation (file, board, repo) that survives between runs; this is the piece every long-running agent depends on. |
+| **Typical failure mode** | A mediocre single output; fixed by rewriting the prompt. | Runaway execution (no termination condition), silent drift from weak verification, state bloat, unhandled tool failures — systems-engineering problems, not prompting problems. |
+| **Skill you're building** | Clear writing, model intuition, output-format control. | Architecture, control-flow/branching logic, evaluation design, memory management, multi-agent coordination. |
+| **Relationship to each other** | Not mutually exclusive. Prompt engineering happens *inside* every node of a loop — every plan, tool call, and self-check is still a well- or poorly-written prompt. Loop engineering is the architecture; prompt engineering is the quality of each individual brick. | |
+
+---
+
+## 4. The Same Idea, Two Products (from Loop Engineering, June 2026)
+
+Both major coding-agent products now ship all five pieces natively — this is presented as a sign the *pattern* has stabilized more than any one tool has won:
+
+| Piece | Job in the loop | Codex app | Claude Code |
+|---|---|---|---|
+| Automations | Scheduled discovery + triage | Automations tab (project, prompt, cadence, environment) → Triage inbox; `/goal` runs until done | Scheduled tasks, cron, `/loop`, `/goal`, hooks, GitHub Actions |
+| Worktrees | Isolate parallel work | Built-in worktree per thread | `git worktree`, `--worktree` flag, `isolation: worktree` on a subagent |
+| Skills | Codify project knowledge | Agent Skills (`SKILL.md`), invoked by name or automatically | Agent Skills (`SKILL.md`) |
+| Plugins / connectors | Reach real tools | Connectors (MCP) + plugins for distribution | MCP servers + plugins |
+| Sub-agents | Ideate and verify | Defined as TOML in `.codex/agents/` | Defined in `.claude/agents/`, plus agent teams |
+| State | Track what's done | Markdown, or Linear via connector | Markdown (e.g. `AGENTS.md`, progress files), or Linear via MCP |
+
+---
+
+## 5. Quick Decision Guide
+
+Reach for **prompt engineering** when:
+- It's a single-turn interaction and a person is right there to judge the output.
+- The task is simple enough to nail in one pass (summarize, classify, translate).
+- Volume is low enough that manual review isn't a bottleneck.
+- You're still exploring what the model can do — you don't yet know what "good" looks like.
+
+Reach for **loop engineering** when:
+- The task is a chain of interdependent steps (research → outline → draft → fact-check).
+- Output needs to clear a consistent quality bar at a volume no human can review one-by-one.
+- The work has to run with nobody watching (scheduled jobs, event-triggered pipelines).
+- You're coordinating more than one agent and something has to own the routing, retries, and stop condition.
+
+## 6. Glossary
+
+- **Loop** — a recursive goal: define a purpose, let the agent iterate until a checkable condition is true.
+- **Harness engineering** — designing the environment a single agent runs inside; loop engineering sits one layer above this.
+- **`/goal`** — an in-session primitive (present in both Claude Code and Codex) that keeps an agent working across turns until a separate, fresh model check confirms a stopping condition is genuinely met — the same maker/checker split applied to the "are we done" question itself.
+- **Maker/checker split** — one agent produces the work, a different agent (or a different model, or a fresh context) verifies it, because a model is a weak judge of its own output.
+- **Comprehension debt** — the growing gap between what your codebase actually does and what you personally understand, widened by shipping loop-generated code without reading it.
+- **Intent debt** — project conventions and unstated context an agent has to re-guess every session if they aren't written down somewhere it can read (a skill file is intent paid off once, reused every run).
