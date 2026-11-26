@@ -79,6 +79,14 @@ Verify any device with `claude mcp list` or `/mcp` inside a session.
 
 ## Agents in this repo
 
+### Video production team (`video-*`, 9 agents)
+
+A crew of subagents for planned short-video series: producer, sound (ElevenLabs),
+motion (Hyperframes scenes), monitor (sync + check gate), render, QA/compliance,
+publisher (studio MCP → Instagram/Facebook, posts stay pending for the owner),
+archivist and analyst. Your main session acts as the Director. Roles, install,
+requirements and the Director starter prompt: [`teams/video-production/README.md`](teams/video-production/README.md).
+
 ### `e2e-tester`
 
 Full end-to-end browser testing of a frontend. Explores the app like a human QA
